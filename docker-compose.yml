@@ -1,0 +1,34 @@
+services:
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-changeme}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-nomadtrip}
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    # Порт наружу не пробрасываем — БД доступна только приложению.
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      APP_ID: ${APP_ID:-nomadtrip}
+      APP_SECRET: ${APP_SECRET:?set APP_SECRET in .env}
+      # Подключение к контейнеру БД по имени сервиса "db", без SSL.
+      DATABASE_URL: mysql://root:${MYSQL_ROOT_PASSWORD:-changeme}@db:3306/${MYSQL_DATABASE:-nomadtrip}
+    ports:
+      - "3000:3000"
+
+volumes:
+  db_data:
